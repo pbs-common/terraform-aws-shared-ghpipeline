@@ -1,0 +1,33 @@
+name: Terraform Validate (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      terraform_version:
+        description: 'Terraform version to use'
+        type: string
+        default: '1.16.0'
+      working_directory:
+        description: 'Directory containing Terraform files (for recursive fmt check)'
+        type: string
+        default: '.'
+      runs_on:
+        description: 'Runner label'
+        type: string
+        default: 'ubuntu-latest'
+
+jobs:
+  validate:
+    name: Format Check
+    runs-on: ${{ inputs.runs_on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive ${{ inputs.working_directory }}
