@@ -166,21 +166,30 @@ jobs:
           script: |
             const fs = require('fs');
             const plan = fs.readFileSync('${{ inputs.working_directory }}/plan_output.txt', 'utf8');
-            const output = `#### Terraform Plan (\`${process.env.ENV_NAME}\`)
+            const envName = process.env.ENV_NAME;
+            const header = `#### Terraform Plan (\`${envName}\`)\n\n<details><summary>Show Plan</summary>\n\n\`\`\`terraform\n`;
+            const footer = `\n\`\`\`\n\n</details>`;
 
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${plan}
-            \`\`\`
-
-            </details>`;
+            // GitHub comments cap at 65536 characters. A plan this large won't fit
+            // whole, so keep the start (sample diffs) and the end (the "Plan: X to
+            // add..." summary, always the most useful line and otherwise lost if we
+            // only truncated the tail), pointing to the full artifact in between.
+            const maxBodyLength = 65536;
+            let body = header + plan + footer;
+            if (body.length > maxBodyLength) {
+              const notice = `\n\n... [truncated - see the full plan in the "terraform-plan-${envName}" artifact on this workflow run] ...\n\n`;
+              const budget = maxBodyLength - header.length - footer.length - notice.length;
+              const tailLength = Math.min(4000, Math.floor(budget * 0.3));
+              const headLength = budget - tailLength;
+              const planSection = plan.slice(0, headLength) + notice + plan.slice(plan.length - tailLength);
+              body = header + planSection + footer;
+            }
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: output
+              body: body
             });
 
       - name: Upload Terraform Plan Artifact
